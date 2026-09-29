@@ -1,5 +1,5 @@
-# WebGL
+# PA1 - WebGL Analytical Surface
 
-Project that accompanies VGGI credit module.
+**Variant 6: The Klein Bottle**
 
-Visit vggi-kpi.blogspot.com for more information
+This project implements a WebGL wireframe renderer for The Klein Bottle surface using parametric equations.
