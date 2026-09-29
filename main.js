@@ -13,24 +13,31 @@ function deg2rad(angle) {
 // Constructor
 function Model(name) {
     this.name = name;
-    this.iVertexBuffer = gl.createBuffer();
-    this.count = 0;
+    this.lines = []; // Зберігатимемо буфери для кожної U та V полілінії окремо
 
-    this.BufferData = function(vertices) {
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
-
-        this.count = vertices.length/3;
+    this.BufferData = function(linesList) {
+        // Проходимося по кожній лінії з масиву і створюємо для неї окремий буфер
+        for (let i = 0; i < linesList.length; i++) {
+            let buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(linesList[i]), gl.STREAM_DRAW);
+            
+            this.lines.push({
+                buffer: buffer,
+                count: linesList[i].length / 3
+            });
+        }
     }
 
     this.Draw = function() {
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-        gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(shProgram.iAttribVertex);
-   
-        gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+        
+        // Малюємо кожну полілінію окремо
+        for (let line of this.lines) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, line.buffer);
+            gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.LINE_STRIP, 0, line.count);
+        }
     }
 }
 
@@ -88,14 +95,47 @@ function draw() {
 
 function CreateSurfaceData()
 {
-    let vertexList = [];
+    let linesList = [];
+    
+    // Межі параметрів для Пляшки Клейна (Figure-8 immersion)
+    const uMin = 0, uMax = 2 * Math.PI, uSteps = 40;
+    const vMin = 0, vMax = 2 * Math.PI, vSteps = 40;
+    const a = 2.0;
 
-    for (let i=0; i<360; i+=5) {
-        vertexList.push( Math.sin(deg2rad(i)), 1, Math.cos(deg2rad(i)) );
-        vertexList.push( Math.sin(deg2rad(i)), 0, Math.cos(deg2rad(i)) );
+    // Локальна функція для обчислення координат однієї точки
+    function getVertex(u, v) {
+        let r = a + Math.cos(u / 2) * Math.sin(v) - Math.sin(u / 2) * Math.sin(2 * v);
+        let x = Math.cos(u) * r;
+        let y = Math.sin(u) * r;
+        let z = Math.sin(u / 2) * Math.sin(v) + Math.cos(u / 2) * Math.sin(2 * v);
+        
+        // Множимо на 0.3 для масштабування, щоб фігура повністю помістилася в камеру
+        return [x * 0.3, y * 0.3, z * 0.3];
     }
 
-    return vertexList;
+    // 1. Генерація U-поліліній (v фіксоване, u змінюється)
+    for (let j = 0; j <= vSteps; j++) {
+        let v = vMin + j * (vMax - vMin) / vSteps;
+        let line = [];
+        for (let i = 0; i <= uSteps; i++) {
+            let u = uMin + i * (uMax - uMin) / uSteps;
+            line.push(...getVertex(u, v));
+        }
+        linesList.push(line);
+    }
+
+    // 2. Генерація V-поліліній (u фіксоване, v змінюється)
+    for (let i = 0; i <= uSteps; i++) {
+        let u = uMin + i * (uMax - uMin) / uSteps;
+        let line = [];
+        for (let j = 0; j <= vSteps; j++) {
+            let v = vMin + j * (vMax - vMin) / vSteps;
+            line.push(...getVertex(u, v));
+        }
+        linesList.push(line);
+    }
+
+    return linesList;
 }
 
 
