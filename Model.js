@@ -48,7 +48,31 @@ class Model {
         this.createBuffer(vVertices, vSteps + 1, uSteps + 1);
     }
 
-    draw(positionLocation) {
-        //логіка малювання
+    createBuffer(vertices, pointsPerLine, lineCount) {
+        const gl = this.gl;
+        const buffer = gl.createBuffer();
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        this.vertexBuffers.push({
+            buffer: buffer,
+            pointsPerLine: pointsPerLine,
+            lineCount: lineCount
+        });
+    }
+
+    draw(positionAttributeLocation) {
+        const gl = this.gl;
+        gl.enableVertexAttribArray(positionAttributeLocation);
+
+        for (let item of this.vertexBuffers) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, item.buffer);
+            gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 0, 0);
+
+            for (let i = 0; i < item.lineCount; i++) {
+                gl.drawArrays(gl.LINE_STRIP, i * item.pointsPerLine, item.pointsPerLine);
+            }
+        }
     }
 }
