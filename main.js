@@ -140,21 +140,52 @@ function animate() {
 function CreateSurfaceData(data, uSteps=40, vSteps=40) {
     let vertices = [];
     let indices = [];
+    let normals = []; // Масив для аналітичних нормалей
+
     const uMin = 0, uMax = 2 * Math.PI, vMin = 0, vMax = 2 * Math.PI;
     const a = 2.0; 
 
+    // 1. ВЕРШИНИ ТА АНАЛІТИЧНІ НОРМАЛІ
     for (let j = 0; j <= vSteps; j++) {
         let v = vMin + j * (vMax - vMin) / vSteps;
         for (let i = 0; i <= uSteps; i++) {
             let u = uMin + i * (uMax - uMin) / uSteps;
+            
+            // --- Координати вершини ---
             let r = a + Math.cos(u / 2) * Math.sin(v) - Math.sin(u / 2) * Math.sin(2 * v);
-            let x = Math.cos(u) * r * 0.3;
-            let y = Math.sin(u) * r * 0.3;
-            let z = (Math.sin(u / 2) * Math.sin(v) + Math.cos(u / 2) * Math.sin(2 * v)) * 0.3;
-            vertices.push(x, y, z);
+            let x = Math.cos(u) * r;
+            let y = Math.sin(u) * r;
+            let z = Math.sin(u / 2) * Math.sin(v) + Math.cos(u / 2) * Math.sin(2 * v);
+            
+            vertices.push(x * 0.3, y * 0.3, z * 0.3);
+
+            // --- Аналітична нормаль (Analytic Normal) ---
+            // Часткові похідні по U
+            let dr_du = -0.5 * Math.sin(u / 2) * Math.sin(v) - 0.5 * Math.cos(u / 2) * Math.sin(2 * v);
+            let dx_du = -Math.sin(u) * r + Math.cos(u) * dr_du;
+            let dy_du = Math.cos(u) * r + Math.sin(u) * dr_du;
+            let dz_du = 0.5 * Math.cos(u / 2) * Math.sin(v) - 0.5 * Math.sin(u / 2) * Math.sin(2 * v);
+
+            // Часткові похідні по V
+            let dr_dv = Math.cos(u / 2) * Math.cos(v) - 2.0 * Math.sin(u / 2) * Math.cos(2 * v);
+            let dx_dv = Math.cos(u) * dr_dv;
+            let dy_dv = Math.sin(u) * dr_dv;
+            let dz_dv = Math.sin(u / 2) * Math.cos(v) + 2.0 * Math.cos(u / 2) * Math.cos(2 * v);
+
+            // Векторний добуток (Tangent U x Tangent V)
+            let nx = dy_du * dz_dv - dz_du * dy_dv;
+            let ny = dz_du * dx_dv - dx_du * dz_dv;
+            let nz = dx_du * dy_dv - dy_du * dx_dv;
+
+            // Нормалізація результату
+            let len = Math.sqrt(nx*nx + ny*ny + nz*nz);
+            if(len > 0) { nx/=len; ny/=len; nz/=len; }
+
+            normals.push(nx, ny, nz);
         }
     }
 
+    // 2. ІНДЕКСИ (FILLED TRIANGLES)
     for (let j = 0; j < vSteps; j++) {
         for (let i = 0; i < uSteps; i++) {
             let p1 = j * (uSteps + 1) + i;
@@ -166,37 +197,9 @@ function CreateSurfaceData(data, uSteps=40, vSteps=40) {
         }
     }
 
-    let normals = new Float32Array(vertices.length);
-    for(let i = 0; i < indices.length; i += 3) {
-        let i1 = indices[i]*3, i2 = indices[i+1]*3, i3 = indices[i+2]*3;
-        
-        let v1 = [vertices[i1], vertices[i1+1], vertices[i1+2]];
-        let v2 = [vertices[i2], vertices[i2+1], vertices[i2+2]];
-        let v3 = [vertices[i3], vertices[i3+1], vertices[i3+2]];
-
-        let dx1 = v2[0]-v1[0], dy1 = v2[1]-v1[1], dz1 = v2[2]-v1[2];
-        let dx2 = v3[0]-v1[0], dy2 = v3[1]-v1[1], dz2 = v3[2]-v1[2];
-
-        let nx = dy1*dz2 - dz1*dy2;
-        let ny = dz1*dx2 - dx1*dz2;
-        let nz = dx1*dy2 - dy1*dx2;
-
-        let len = Math.sqrt(nx*nx + ny*ny + nz*nz);
-        if(len > 0) { nx/=len; ny/=len; nz/=len; }
-
-        normals[i1]+=nx; normals[i1+1]+=ny; normals[i1+2]+=nz;
-        normals[i2]+=nx; normals[i2+1]+=ny; normals[i2+2]+=nz;
-        normals[i3]+=nx; normals[i3+1]+=ny; normals[i3+2]+=nz;
-    }
-    
-    for(let i = 0; i < normals.length; i += 3) {
-        let nx = normals[i], ny = normals[i+1], nz = normals[i+2];
-        let len = Math.sqrt(nx*nx + ny*ny + nz*nz);
-        if(len > 0) { normals[i]/=len; normals[i+1]/=len; normals[i+2]/=len; }
-    }
-
+    // Зберігаємо дані в об'єкт
     data.verticesF32 = new Float32Array(vertices);
-    data.normalsF32 = normals;
+    data.normalsF32 = new Float32Array(normals);
     data.indicesU16 = new Uint16Array(indices);
 }
 
