@@ -1,12 +1,11 @@
 'use strict';
 
-let gl;                         // The webgl context.
-let surface;                    // A surface model
-let shProgram;                  // A shader program
-let spaceball;                  // A SimpleRotator object
+let gl;
+let surface;
+let shProgram;
+let spaceball;
 
-// --- ШЕЙДЕРИ ДЛЯ GOURAUD SHADING ---
-const vertexShaderSource = `
+const gouraudVertexShader = `
     attribute vec3 vertex;
     attribute vec3 normal;
     
@@ -19,10 +18,8 @@ const vertexShaderSource = `
     void main() {
         gl_Position = ModelViewProjectionMatrix * vec4(vertex, 1.0);
         
-        // Координати вершини у видовому просторі
         vec4 eyeVertex = ModelViewMatrix * vec4(vertex, 1.0);
         
-        // Матриця нормалей
         mat3 normalMatrix = mat3(
             ModelViewMatrix[0].xyz,
             ModelViewMatrix[1].xyz,
@@ -30,12 +27,10 @@ const vertexShaderSource = `
         );
         vec3 eyeNormal = normalize(normalMatrix * normal);
         
-        // Вектори для освітлення
         vec3 L = normalize(lightPosition - eyeVertex.xyz);
-        vec3 V = vec3(0.0, 0.0, 1.0); // За підказкою (0,0,1)
+        vec3 V = vec3(0.0, 0.0, 1.0); 
         vec3 R = reflect(-L, eyeNormal);
         
-        // Компоненти освітлення (Irgb = Ambient + Diffuse + Specular)
         vec3 ambient = vec3(0.1, 0.1, 0.2);
         vec3 diffuseColor = vec3(0.0, 0.6, 0.8);
         vec3 specularColor = vec3(1.0, 1.0, 1.0);
@@ -48,7 +43,7 @@ const vertexShaderSource = `
     }
 `;
 
-const fragmentShaderSource = `
+const gouraudFragmentShader = `
     precision mediump float;
     varying vec4 vColor;
     
@@ -57,7 +52,6 @@ const fragmentShaderSource = `
     }
 `;
 
-// Constructor
 function Model(name) {
     this.name = name;
     this.iVertexBuffer = gl.createBuffer();
@@ -88,11 +82,11 @@ function Model(name) {
         gl.enableVertexAttribArray(shProgram.iAttribNormal);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.iIndexBuffer);
+        // Малюємо зафарбовані трикутники!
         gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
     }
 }
 
-// Constructor
 function ShaderProgram(name, program) {
     this.name = name;
     this.prog = program;
@@ -104,9 +98,7 @@ function ShaderProgram(name, program) {
     this.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
     this.iLightPos = gl.getUniformLocation(program, "lightPosition");
 
-    this.Use = function() {
-        gl.useProgram(this.prog);
-    }
+    this.Use = function() { gl.useProgram(this.prog); }
 }
 
 function draw() { 
@@ -123,12 +115,10 @@ function draw() {
     let matAccum1 = m4.multiply(translateToPointZero, matAccum0 );
     let modelViewProjection = m4.multiply(projection, matAccum1 );
 
-    // --- ОБЕРТАННЯ ДЖЕРЕЛА СВІТЛА ---
     let time = Date.now() * 0.001; 
     let lightRadius = 3.0;
     let lightWorld = [lightRadius * Math.cos(time), lightRadius * Math.sin(time), 2.0, 1.0];
 
-    // Множимо координати світла на матрицю ModelView
     let c = matAccum1;
     let lx = lightWorld[0]*c[0] + lightWorld[1]*c[4] + lightWorld[2]*c[8] + lightWorld[3]*c[12];
     let ly = lightWorld[0]*c[1] + lightWorld[1]*c[5] + lightWorld[2]*c[9] + lightWorld[3]*c[13];
@@ -139,9 +129,12 @@ function draw() {
     gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccum1);
 
     surface.Draw();
-    
-    // Цикл для анімації обертання світла
-    requestAnimationFrame(draw);
+}
+
+// Окрема функція для нескінченної анімації світла
+function animate() {
+    draw();
+    requestAnimationFrame(animate);
 }
 
 function CreateSurfaceData(data, uSteps=40, vSteps=40) {
@@ -150,7 +143,6 @@ function CreateSurfaceData(data, uSteps=40, vSteps=40) {
     const uMin = 0, uMax = 2 * Math.PI, vMin = 0, vMax = 2 * Math.PI;
     const a = 2.0; 
 
-    // 1. Вершини (Variant 6 - The Klein Bottle)
     for (let j = 0; j <= vSteps; j++) {
         let v = vMin + j * (vMax - vMin) / vSteps;
         for (let i = 0; i <= uSteps; i++) {
@@ -163,7 +155,6 @@ function CreateSurfaceData(data, uSteps=40, vSteps=40) {
         }
     }
 
-    // 2. Індекси (FILLED TRIANGLES)
     for (let j = 0; j < vSteps; j++) {
         for (let i = 0; i < uSteps; i++) {
             let p1 = j * (uSteps + 1) + i;
@@ -175,7 +166,6 @@ function CreateSurfaceData(data, uSteps=40, vSteps=40) {
         }
     }
 
-    // 3. Нормалі (Facet Average Normal)
     let normals = new Float32Array(vertices.length);
     for(let i = 0; i < indices.length; i += 3) {
         let i1 = indices[i]*3, i2 = indices[i+1]*3, i3 = indices[i+2]*3;
@@ -223,7 +213,8 @@ function updateSurface() {
 }
 
 function initGL() {
-    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    // Використовуємо нові змінні з Gouraud shaders
+    let prog = createProgram( gl, gouraudVertexShader, gouraudFragmentShader );
 
     shProgram = new ShaderProgram('Basic', prog);
     shProgram.Use();
@@ -268,9 +259,18 @@ function init() {
         if ( ! gl ) { throw "Browser does not support WebGL"; }
     }
     catch (e) { return; }
-    try { initGL(); } catch (e) { return; }
+    
+    try { 
+        initGL(); 
+    } catch (e) { 
+        
+        console.error("WebGL Error:", e);
+        alert("WebGL Error: " + e.message);
+        return; 
+    }
 
-    // Змінено null замість draw, щоб уникнути конфлікту з requestAnimationFrame
-    spaceball = new TrackballRotator(canvas, null, 0); 
-    draw();
+    
+    spaceball = new TrackballRotator(canvas, function(){}, 0); 
+    
+    animate();
 }
