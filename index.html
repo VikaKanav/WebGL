@@ -1,33 +1,44 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
-
-<title>PA#1</title>
+<title>Control Task (Variant 6)</title>
 <style>
     body {
-        background-color: #EEEEEE;
+        background-color: #333333;
+        color: white;
+        font-family: sans-serif;
     }
 </style>
 
 <script src="./Utils/trackball-rotator.js"></script>
 <script src="./Utils/m4.js"></script>
-<script src="./shader.gpu"></script>
-<script src="./Model.js"></script>
-<script src="./TextureHandler.js"></script>
 <script src="./main.js"></script>
 
 </head>
 <body onload="init()">
 
-<h2>A Cube with "Trackball" Mouse Rotation</h2>
+<h2>Control Task: Texturing the Klein Bottle (Variant 6)</h2>
+<p>Prepared by Viktoriia Kanavets, student of group TP-61mp</p>
 
-<p id="message">Drag your mouse on the cube to rotate it.<br>
-(On a touch screen, you can use your finger.)</p>
+<p id="message">Drag your mouse on the surface to rotate it.</p>
 
+<div style="margin-bottom: 10px;">
+    <label>U Granularity (Steps): 
+        <input type="range" id="uSlider" min="10" max="100" value="60" oninput="updateSurface()">
+    </label>
+    <span id="uVal">60</span><br>
+    
+    <label>V Granularity (Steps): 
+        <input type="range" id="vSlider" min="10" max="100" value="60" oninput="updateSurface()">
+    </label>
+    <span id="vVal">60</span>
+</div>
 
 <div id="canvas-holder">
    <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
 </div>
 
-
-</body></html>
+</body>
+</html>
