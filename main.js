@@ -228,6 +228,18 @@ function CreateSurfaceData(data, uSteps=60, vSteps=60) {
     data.indicesU16 = new Uint16Array(indices);
 }
 
+function updateSurface() {
+    let uSteps = parseInt(document.getElementById('uSlider')?.value || 60);
+    let vSteps = parseInt(document.getElementById('vSlider')?.value || 60);
+    if(document.getElementById('uVal')) document.getElementById('uVal').innerText = uSteps;
+    if(document.getElementById('vVal')) document.getElementById('vVal').innerText = vSteps;
+    
+    let data = {};
+    CreateSurfaceData(data, uSteps, vSteps);
+    
+    surface.BufferData(data.verticesF32, data.indicesU16, data.texcoordsF32, data.normalsF32, data.tangentsF32);
+}
+
 function LoadTexture(url) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
