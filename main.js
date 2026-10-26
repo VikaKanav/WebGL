@@ -187,7 +187,8 @@ function CreateSurfaceData(data, uSteps=60, vSteps=60) {
             let z = (Math.sin(u / 2) * Math.sin(v) + Math.cos(u / 2) * Math.sin(2 * v)) * 0.3;
             vertices.push(x, y, z);
 
-            texcoords.push(i / uSteps * 4.0, j / vSteps * 4.0);
+            // ВИПРАВЛЕНО: UV координати тепер строго від 0.0 до 1.0 для CLAMP_TO_EDGE
+            texcoords.push(i / uSteps, j / vSteps);
 
             let dr_du = -0.5 * Math.sin(u / 2) * Math.sin(v) - 0.5 * Math.cos(u / 2) * Math.sin(2 * v);
             let dx_du = -Math.sin(u) * r + Math.cos(u) * dr_du;
@@ -236,7 +237,10 @@ function LoadTexture(url) {
     image.onload = function() {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        gl.generateMipmap(gl.TEXTURE_2D);
+        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     };
     image.src = url;
     return texture;
@@ -297,9 +301,9 @@ function initGL() {
     surface.BufferData(data.verticesF32, data.indicesU16, data.texcoordsF32, data.normalsF32, data.tangentsF32);
 
     // Підключення текстур
-    surface.idTextureDiffuse  = LoadTexture("diffuse.png");
-    surface.idTextureSpecular = LoadTexture("specular.png");
-    surface.idTextureNormal   = LoadTexture("normal.png");
+    surface.idTextureDiffuse  = LoadTexture("textures/diffuse.png");
+    surface.idTextureSpecular = LoadTexture("textures/specular.png");
+    surface.idTextureNormal   = LoadTexture("textures/normal.png");
 
     gl.enable(gl.DEPTH_TEST);
 }
