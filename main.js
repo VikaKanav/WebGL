@@ -49,19 +49,19 @@ const fragmentShaderSource = `
     uniform vec3 lightPosition;
     
     void main() {
-        // Ортогоналізація Грама-Шмідта з пріоритетом Нормалі (Варіант 6)
+        // Ортогоналізація Грама-Шмідта (Пріоритет Нормалі - Варіант 6)
         vec3 N = normalize(vNormal);
         vec3 T = normalize(vTangent);
-        T = normalize(T - dot(T, N) * N); // Пріоритет нормалі
+        T = normalize(T - dot(T, N) * N);
         vec3 B = cross(N, T);
         mat3 TBN = mat3(T, B, N);
         
-        // Читання текстур
+        // Текстури тепер ідеально гладкі завдяки міпмапам
         vec4 diffColor = texture2D(iTMU0, vTex);
         vec4 specColor = texture2D(iTMU1, vTex);
         vec3 normalMap = texture2D(iTMU2, vTex).rgb;
         
-        // Декодування нормалі та перехід у видовий простір
+        // Декодування нормалі
         normalMap = normalMap * 2.0 - 1.0;
         vec3 finalNormal = normalize(TBN * normalMap);
         
@@ -70,7 +70,7 @@ const fragmentShaderSource = `
         vec3 V = vec3(0.0, 0.0, 1.0); 
         vec3 R = reflect(-L, finalNormal);
         
-        vec3 ambient = vec3(0.1, 0.1, 0.1);
+        vec3 ambient = vec3(0.2, 0.2, 0.2);
         float diff = max(dot(finalNormal, L), 0.0);
         float spec = pow(max(dot(R, V), 0.0), 32.0);
         
@@ -187,8 +187,8 @@ function CreateSurfaceData(data, uSteps=60, vSteps=60) {
             let z = (Math.sin(u / 2) * Math.sin(v) + Math.cos(u / 2) * Math.sin(2 * v)) * 0.3;
             vertices.push(x, y, z);
 
-            // ВИПРАВЛЕНО: UV координати тепер строго від 0.0 до 1.0 для CLAMP_TO_EDGE
-            texcoords.push(i / uSteps, j / vSteps);
+            // Множимо координати на 6, щоб цегла гарно повторювалася по фігурі
+            texcoords.push((i / uSteps) * 6.0, (j / vSteps) * 6.0);
 
             let dr_du = -0.5 * Math.sin(u / 2) * Math.sin(v) - 0.5 * Math.cos(u / 2) * Math.sin(2 * v);
             let dx_du = -Math.sin(u) * r + Math.cos(u) * dr_du;
@@ -204,8 +204,10 @@ function CreateSurfaceData(data, uSteps=60, vSteps=60) {
             let ny = dz_du * dx_dv - dx_du * dz_dv;
             let nz = dx_du * dy_dv - dy_du * dx_dv;
 
+            // Захист від критичних помилок освітлення
             let lenN = Math.sqrt(nx*nx + ny*ny + nz*nz);
             if(lenN > 0) { nx/=lenN; ny/=lenN; nz/=lenN; }
+            else { nx = 0; ny = 0; nz = 1; }
             normals.push(nx, ny, nz);
 
             let lenT = Math.sqrt(dx_du*dx_du + dy_du*dy_du + dz_du*dz_du);
@@ -236,30 +238,37 @@ function updateSurface() {
     
     let data = {};
     CreateSurfaceData(data, uSteps, vSteps);
-    
     surface.BufferData(data.verticesF32, data.indicesU16, data.texcoordsF32, data.normalsF32, data.tangentsF32);
 }
 
 function LoadTexture(url) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([200, 200, 200, 255]));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([150, 150, 150, 255]));
 
     const image = new Image();
     image.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, 512, 512);
+
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
         
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // Тепер ми можемо увімкнути згладжування і безшовне повторення!
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     };
     image.src = url;
     return texture;
 }
 
 function draw() { 
-    gl.clearColor(0.2, 0.2, 0.2, 1);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     let projection = m4.perspective(Math.PI/8, 1, 8, 12); 
@@ -312,7 +321,6 @@ function initGL() {
     surface = new Model('Surface');
     surface.BufferData(data.verticesF32, data.indicesU16, data.texcoordsF32, data.normalsF32, data.tangentsF32);
 
-    // Підключення текстур
     surface.idTextureDiffuse  = LoadTexture("textures/diffuse.png");
     surface.idTextureSpecular = LoadTexture("textures/specular.png");
     surface.idTextureNormal   = LoadTexture("textures/normal.png");
